@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exchange_money_bot.models import SellOffer
@@ -10,6 +10,58 @@ ALLOWED_CURRENCIES = frozenset({"EUR", "USD", "USDT"})
 
 def currency_label_fa(code: str) -> str:
     return {"EUR": "یورو", "USD": "دلار", "USDT": "تتر"}.get(code, code)
+
+
+async def count_public_sell_offers(
+    session: AsyncSession,
+    *,
+    exclude_telegram_id: Optional[int] = None,
+    currency: Optional[str] = None,
+) -> int:
+    stmt = select(func.count()).select_from(SellOffer)
+    if exclude_telegram_id is not None:
+        stmt = stmt.where(SellOffer.telegram_id != exclude_telegram_id)
+    if currency is not None:
+        if currency not in ALLOWED_CURRENCIES:
+            raise ValueError(f"Invalid currency: {currency}")
+        stmt = stmt.where(SellOffer.currency == currency)
+    result = await session.execute(stmt)
+    return int(result.scalar_one())
+
+
+async def count_offers_by_telegram_and_currency(
+    session: AsyncSession,
+    telegram_id: int,
+    currency: str,
+) -> int:
+    if currency not in ALLOWED_CURRENCIES:
+        raise ValueError(f"Invalid currency: {currency}")
+    stmt = select(func.count()).select_from(SellOffer).where(
+        SellOffer.telegram_id == telegram_id,
+        SellOffer.currency == currency,
+    )
+    result = await session.execute(stmt)
+    return int(result.scalar_one())
+
+
+async def list_public_sell_offers(
+    session: AsyncSession,
+    *,
+    exclude_telegram_id: Optional[int] = None,
+    currency: Optional[str] = None,
+    limit: int = 5,
+    offset: int = 0,
+) -> list[SellOffer]:
+    stmt = select(SellOffer).order_by(SellOffer.created_at.desc())
+    if exclude_telegram_id is not None:
+        stmt = stmt.where(SellOffer.telegram_id != exclude_telegram_id)
+    if currency is not None:
+        if currency not in ALLOWED_CURRENCIES:
+            raise ValueError(f"Invalid currency: {currency}")
+        stmt = stmt.where(SellOffer.currency == currency)
+    stmt = stmt.limit(limit).offset(offset)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
 
 
 async def list_offers_for_user(session: AsyncSession, user_id: int) -> list[SellOffer]:

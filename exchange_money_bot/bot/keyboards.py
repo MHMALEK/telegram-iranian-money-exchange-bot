@@ -20,6 +20,19 @@ def with_back_to_main(markup: InlineKeyboardMarkup) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
+def buyer_currency_pick_keyboard() -> InlineKeyboardMarkup:
+    """قبل از فهرست خرید: انتخاب یورو / دلار / تتر."""
+    return with_back_to_main(
+        InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("یورو (EUR)", callback_data="buy:ccy:EUR")],
+                [InlineKeyboardButton("دلار (USD)", callback_data="buy:ccy:USD")],
+                [InlineKeyboardButton("تتر (USDT)", callback_data="buy:ccy:USDT")],
+            ]
+        )
+    )
+
+
 def main_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [

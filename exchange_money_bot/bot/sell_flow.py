@@ -237,6 +237,19 @@ async def sell_conversation_cancel(update: Update, context: ContextTypes.DEFAULT
     return ConversationHandler.END
 
 
+async def sell_buy_flow_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """خروج از فرم فروش اگر کاربر حین گفتگو دکمهٔ خرید (انتخاب ارز / فهرست / صفحه) بزند."""
+    query = update.callback_query
+    if query is None or query.message is None or query.from_user is None:
+        return ConversationHandler.END
+    context.user_data.pop("sell_amount", None)
+    context.user_data.pop("sell_currency", None)
+    from exchange_money_bot.bot.main import execute_buy_flow_callback
+
+    await execute_buy_flow_callback(query)
+    return ConversationHandler.END
+
+
 async def sell_menu_main(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     if query is None or query.message is None:
@@ -254,6 +267,10 @@ def build_sell_conversation_handler() -> ConversationHandler:
     menu_main_handler = CallbackQueryHandler(
         sell_menu_main,
         pattern=rf"^{MENU_MAIN_CALLBACK}$",
+    )
+    buy_flow_handler = CallbackQueryHandler(
+        sell_buy_flow_fallback,
+        pattern=r"^buy:(choose|ccy:(USDT|EUR|USD)|cat:(USDT|EUR|USD):\d+)$",
     )
     return ConversationHandler(
         entry_points=[CallbackQueryHandler(sell_entry, pattern=r"^start:1$")],
@@ -279,6 +296,7 @@ def build_sell_conversation_handler() -> ConversationHandler:
         fallbacks=[
             CommandHandler("cancel", sell_conversation_cancel),
             menu_main_handler,
+            buy_flow_handler,
         ],
         name="sell_flow",
     )

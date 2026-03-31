@@ -1,0 +1,74 @@
+# Build, push to GHCR (public), deploy to Oracle VM over SSH.
+#
+# GitHub → Settings → Secrets and variables → Actions:
+#   VM_HOST      — VM IP or hostname (e.g. 134.x.x.x)
+#   VM_USER      — SSH user (e.g. ubuntu)
+#   VM_SSH_KEY   — Private key (full PEM, including -----BEGIN ... END-----)
+#
+# On the VM (once): mkdir -p /home/ubuntu/exchange-money-bot
+#                   place .env at the path in VM_ENV_FILE_PATH below
+# After first push: Packages → exchange-money-bot → Package settings → Change visibility → Public
+#
+name: Build and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vm
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  # Path to .env on the VM (edit if yours differs)
+  VM_ENV_FILE_PATH: /home/ubuntu/exchange-money-bot/.env
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image name (GHCR requires lowercase)
+        run: echo "IMAGE_NAME=${REGISTRY}/$(echo ${GITHUB_REPOSITORY} | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Deploy on VM
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            docker pull "${{ env.IMAGE_NAME }}:latest"
+            docker stop exchange-money-bot 2>/dev/null || true
+            docker rm exchange-money-bot 2>/dev/null || true
+            docker run -d \
+              --name exchange-money-bot \
+              --restart unless-stopped \
+              --env-file "${{ env.VM_ENV_FILE_PATH }}" \
+              -p 8000:8000 \
+              "${{ env.IMAGE_NAME }}:latest"

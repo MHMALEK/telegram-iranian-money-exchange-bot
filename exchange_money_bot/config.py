@@ -1,6 +1,5 @@
 from typing import Optional
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,27 +13,38 @@ class Settings(BaseSettings):
     api_base_url: Optional[str] = None
     """If set, the bot pings the API after upsert (optional loose coupling)."""
 
-    start_button_1_text: str = "قصد فروش ارز و دریافت ریال دارم"
-    start_button_2_text: str = "قصد خرید ارز و پرداخت ریال دارم"
-    start_button_1_reply: str = (
-        "شما گزینهٔ «فروش ارز و دریافت ریال» را انتخاب کردید. "
-        "به‌زودی ادامهٔ فرآیند را اینجا اضافه می‌کنیم."
-    )
-    # Buyer flow shows the live offer list in the bot; this env override is unused.
-    start_button_2_reply: str = ""
+    telegram_listings_channel_id: Optional[str] = None
+    """Channel chat id (@username or -100…) where new sell offers are posted. Bot must be admin."""
 
-    buyer_catalog_page_size: int = Field(default=20, ge=1, le=30)
-    """Offers per catalog page. Telegram allows ~100 inline buttons; 20 rows + nav + back stays safe."""
+    telegram_membership_channel_id: Optional[str] = None
+    """If set with enforce flag, users must be members of this chat. Defaults to listings channel when unset."""
 
-    buyer_show_irr_rates: bool = True
-    """Show approximate USD/EUR to IRR on buyer screens (fetched from public JSON)."""
+    telegram_enforce_channel_membership: bool = False
+    """When True and a membership channel id is available, block bot use for non-members."""
 
-    buyer_irr_rates_ttl_seconds: int = Field(default=120, ge=30, le=3600)
-    """Cache TTL for fiat IRR snapshot (seconds)."""
+    telegram_channel_invite_url: Optional[str] = None
+    """https://t.me/… link shown on «join channel» and «open listings» prompts."""
 
-    buyer_irr_rates_usd_json_url: Optional[str] = None
-    buyer_irr_rates_eur_json_url: Optional[str] = None
-    """Override JSON URLs; defaults use margani/pricedb GitHub raw (tgju)."""
+    def effective_membership_channel_id(self) -> Optional[str]:
+        return self.telegram_membership_channel_id or self.telegram_listings_channel_id
+
+    def membership_gate_active(self) -> bool:
+        return self.telegram_enforce_channel_membership and bool(
+            self.effective_membership_channel_id()
+        )
+
+    def effective_listings_channel_open_url(self) -> Optional[str]:
+        """Public URL for «open channel» buttons: invite link, else https://t.me/name if id is @name."""
+        if self.telegram_channel_invite_url:
+            s = self.telegram_channel_invite_url.strip()
+            if s:
+                return s
+        cid = (self.telegram_listings_channel_id or "").strip()
+        if cid.startswith("@"):
+            u = cid[1:].strip()
+            if u:
+                return f"https://t.me/{u}"
+        return None
 
 
 settings = Settings()

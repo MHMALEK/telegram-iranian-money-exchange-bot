@@ -13,7 +13,8 @@ STRINGS: dict[str, str] = {
     # Main menu & navigation
     "keyboard.back_main": "بازگشت به منوی اصلی",
     "keyboard.menu_rial": "مشاهده لیست فروشندگان ارز",
-    "keyboard.menu_fx": "ثبت آگهی برای فروش یورو/دلار",
+    "keyboard.menu_fx": "ایجاد آگهی برای تبدیل ارز به ریال",
+    "keyboard.menu_rial_to_fx": "ایجاد آگهی برای تبدیل ریال به ارز",
     "keyboard.menu_spot_rates": "قیمت لحظه‌ای دلار و یورو (ریال)",
     "keyboard.menu_my_offers": "مدیریت آگهی‌های من",
     "keyboard.menu_delete_account": "حذف اکانت",
@@ -27,7 +28,7 @@ STRINGS: dict[str, str] = {
     ),
     "membership.sell_gate_html": (
         "<b>عضویت الزامی است</b>\n\n"
-        "برای ثبت آگهی فروش باید شرایط عضویت (کانال/گروه طبق تنظیمات) را داشته باشید؛ "
+        "برای ثبت آگهی باید شرایط عضویت (کانال/گروه طبق تنظیمات) را داشته باشید؛ "
         "اگر کانال و گروه هر دو فعال باشند، در هر دو عضو باشید. سپس دوباره از منو اقدام کنید."
     ),
     "channel.btn_join": "ورود به کانال",
@@ -39,6 +40,10 @@ STRINGS: dict[str, str] = {
         "اتصال به منبع قیمت برقرار نشد؛ بعداً دوباره همین گزینه را از منو بزنید."
     ),
     "rates.listing_rial_gone": "این آگهی دیگر در ربات ثبت نیست.",
+    "rates.listing_rial_not_applicable": (
+        "این آگهی از نوع «ریال به ارز» است و مبلغ آن به ریال است؛ "
+        "دکمهٔ معادل ریالی فقط برای آگهی‌های فروش ارز فعال است."
+    ),
     "rates.listing_rial_no_rate": "الان نرخ دلار/یورو به‌روز نیست؛ بعداً دوباره بزنید.",
     "rates.listing_rial_alert": (
         "{amount:,} {ccy_fa} ({code})\n"
@@ -65,18 +70,24 @@ STRINGS: dict[str, str] = {
         "<i>اگر لینک مستقیم باز نشد، کانال را در تلگرام جستجو کنید یا از ادمین بخواهید لینک عضویت بفرستد.</i>"
     ),
     # Channel listing post (HTML; dynamic parts are escaped before format)
-    # Hashtags: currency (#EUR/#USD) + side (#فروش). Plain text for channel search.
-    "listing.header_html": "💱 <b>آگهی فروش ارز</b>",
-    "listing.amount_line": "💰 مبلغ: <b>{amount:,}</b> {ccy_fa} ({currency})",
+    # Hashtags: currency + side (#فروش / #خرید). Plain text for channel search.
+    "listing.header_fx_to_rial_html": "💱 <b>آگهی فروش ارز (ارز به ریال)</b>",
+    "listing.header_rial_to_fx_html": "💱 <b>آگهی خرید ارز (ریال به ارز)</b>",
+    "listing.amount_line_fx_to_rial": "💰 مبلغ: <b>{amount:,}</b> {ccy_fa} ({currency})",
+    "listing.amount_line_rial_to_fx": (
+        "💰 مبلغ ریال: <b>{amount:,}</b> — ارز موردنظر: <b>{ccy_fa}</b> ({currency})"
+    ),
     "listing.description_line": "📝 <b>توضیحات:</b> {text}",
     "listing.payment_line": "💳 <b>نحوه پرداخت:</b> {text}",
     "listing.seller_line": "👤 فروشنده: {name}",
     "listing.telegram_line": "📱 تلگرام: {telegram_line}",
-    "listing.tags_template": "🏷 #{currency} #فروش",
+    "listing.tags_template_fx_to_rial": "🏷 #{currency} #فروش #ارز_به_ریال",
+    "listing.tags_template_rial_to_fx": "🏷 #{currency} #خرید #ریال_به_ارز",
     "listing.no_username": "بدون نام کاربری — از دکمهٔ تماس استفاده کنید",
     "listing.closed_note": "<i>این آگهی برداشته شد.</i>",
     "listing.sold_note": "<i>فروش انجام شد — این آگهی دیگر فعال نیست.</i>",
     "listing.contact_btn": "تماس — {amount:,} {ccy_fa}",
+    "listing.contact_btn_rial_to_fx": "تماس — {amount:,} ریال → {ccy_fa}",
     "listing.rial_btn": "≈ معادل ریالی",
     # Home & consent
     "home.registered": (
@@ -114,7 +125,7 @@ STRINGS: dict[str, str] = {
     "error.offer_not_yours": "این آگهی مال شما نیست یا قبلاً حذف شده.",
     "error.offer_save": "ذخیره نشد. دوباره تلاش کنید.",
     "error.data_lost": "خطا در داده‌ها. دوباره از منو شروع کنید.",
-    "error.amount_lost": "خطا: مبلغ ذخیره نشد. دوباره از منو «فروش» را بزنید.",
+    "error.amount_lost": "خطا: مبلغ ذخیره نشد. دوباره از منوی اصلی همان نوع آگهی را بزنید.",
     "error.user_not_found": "کاربر یافت نشد. /start را بزنید.",
     "success.offer_deleted": "آگهی حذف شد.",
     "success.offer_sold": "ثبت شد: فروش رفت. آگهی در کانال بسته شد.",
@@ -127,30 +138,47 @@ STRINGS: dict[str, str] = {
     "account.deleted_short": "اطلاعات شما حذف شد.",
     "account.nothing_stored": "اطلاعاتی از شما ذخیره نشده بود.",
     # My offers UI
-    "offers.title_html": "<b>آگهی‌های فروش من</b>",
+    "offers.title_html": "<b>آگهی‌های من</b>",
     "offers.empty": "هنوز آگهی فعالی ثبت نکرده‌اید.",
-    "offers.line_html": "{i}) مبلغ <b>{amount:,}</b> {ccy} — ثبت: {dt}{desc_suffix}{pay_suffix}",
+    "offers.kind_fx_to_rial": "[ارز→ریال]",
+    "offers.kind_rial_to_fx": "[ریال→ارز]",
+    "offers.line_html_fx_to_rial": (
+        "{kind_prefix} {i}) مبلغ <b>{amount:,}</b> {ccy} — ثبت: {dt}{desc_suffix}{pay_suffix}"
+    ),
+    "offers.line_html_rial_to_fx": (
+        "{kind_prefix} {i}) <b>{amount:,}</b> ریال برای خرید <b>{ccy}</b> — ثبت: {dt}{desc_suffix}{pay_suffix}"
+    ),
     "offers.payment_line_html": "\n   💳 <i>{methods}</i>",
     "offers.desc_line_html": "\n   📝 <i>{snippet}</i>",
     "offers.btn_remove_i": "{i}) حذف",
     "offers.btn_sold_i": "{i}) فروش رفت",
     "offers.relist_hint_html": (
         "برای <b>تبلیغ دوباره</b> با مبلغ یا شرایط جدید، از منوی اصلی "
-        "«<b>ثبت آگهی فروش ارز</b>» را بزنید و یک آگهی تازه ثبت کنید؛ هر بار فقط همان آگهیٔ جدید در کانال دیده می‌شود."
+        "«<b>ایجاد آگهی برای تبدیل ارز به ریال</b>» یا "
+        "«<b>ایجاد آگهی برای تبدیل ریال به ارز</b>» را بزنید و یک آگهی تازه ثبت کنید؛ "
+        "هر بار فقط همان آگهیٔ جدید در کانال دیده می‌شود."
     ),
     # Sell flow
-    "sell.register_first": "برای فروش ارز ابتدا با /start ثبت‌نام کنید.",
+    "sell.register_first": "برای ثبت آگهی ابتدا با /start ثبت‌نام کنید.",
     "sell.amount_prompt": (
         "مبلغی را که می‌خواهید بفروشید وارد کنید.\n\n"
         "فقط با اعداد انگلیسی (0 تا 9)، بدون فاصله، ویرگول یا نقطه.\n"
         "مثال: 100 یا 1000 یا 150\n\n"
         "برای لغو این فرم: /cancel"
     ),
+    "sell.amount_prompt_rial_to_fx": (
+        "مبلغ <b>ریالی</b> که می‌خواهید با آن ارز بخرید را وارد کنید.\n\n"
+        "فقط با اعداد انگلیسی (0 تا 9)، بدون فاصله، ویرگول یا نقطه.\n"
+        "مثال: 50000000 یا 120000000\n\n"
+        "برای لغو این فرم: /cancel"
+    ),
     "sell.amount_invalid": (
         "عدد نامعتبر است. فقط ارقام انگلیسی 0-9، بدون فاصله و بدون نقطه. دوباره بفرستید."
     ),
-    "sell.pick_currency": "ارز را انتخاب کنید:",
+    "sell.pick_currency": "کدام ارز را می‌فروشید؟ انتخاب کنید:",
+    "sell.pick_currency_rial_to_fx": "کدام ارز را می‌خواهید بخرید؟ انتخاب کنید:",
     "sell.currency_reminder": "لطفاً با یکی از دکمه‌ها، ارز را انتخاب کنید.",
+    "sell.currency_reminder_rial_to_fx": "لطفاً با یکی از دکمه‌ها، ارز موردنظر را انتخاب کنید.",
     "sell.btn_eur": "یورو (EUR)",
     "sell.btn_usd": "دلار (USD)",
     "sell.description_prompt": (
@@ -178,10 +206,20 @@ STRINGS: dict[str, str] = {
     "sell.summary_description": "توضیحات: {desc}",
     "sell.summary_no_description": "توضیحات: —",
     "sell.summary_payment": "نحوه پرداخت: {methods}",
-    "sell.summary": (
-        "خلاصهٔ آگهی فروش:\n\n"
+    "sell.summary_fx_to_rial": (
+        "خلاصهٔ آگهی (تبدیل ارز به ریال):\n\n"
         "مبلغ: {amount:,}\n"
         "ارز: {currency_label}\n"
+        "{description_block}\n"
+        "{payment_block}\n"
+        "نام نمایشی: {display_name}\n"
+        "یوزرنیم تلگرام: {uname}\n\n"
+        "برای انصراف «انصراف» را بزنید؛ اگر درست است «تایید و ثبت»."
+    ),
+    "sell.summary_rial_to_fx": (
+        "خلاصهٔ آگهی (تبدیل ریال به ارز):\n\n"
+        "مبلغ ریال: {amount:,}\n"
+        "ارز موردنظر: {currency_label}\n"
         "{description_block}\n"
         "{payment_block}\n"
         "نام نمایشی: {display_name}\n"
@@ -194,8 +232,13 @@ STRINGS: dict[str, str] = {
     "sell.btn_submit": "تایید و ثبت",
     "sell.btn_abort": "انصراف",
     "sell.aborted": "ثبت آگهی لغو شد.\nیکی از گزینه‌های منو را انتخاب کنید:",
-    "sell.cancelled_cmd": "فرم فروش لغو شد. از منوی زیر ادامه دهید:",
-    "sell.success_intro": "ثبت شما انجام شد.\nمبلغ {amount:,} {currency_label}.\n{channel_note}",
+    "sell.cancelled_cmd": "ثبت آگهی لغو شد. از منوی زیر ادامه دهید:",
+    "sell.success_intro_fx_to_rial": (
+        "ثبت شما انجام شد.\nمبلغ {amount:,} {currency_label} (فروش ارز).\n{channel_note}"
+    ),
+    "sell.success_intro_rial_to_fx": (
+        "ثبت شما انجام شد.\nمبلغ {amount:,} ریال برای خرید {currency_label}.\n{channel_note}"
+    ),
     "sell.success_channel_on_html": (
         "آگهی شما در <b>کانال</b> هم منتشر شد؛ خریداران از آنجا می‌توانند با شما تماس بگیرند."
     ),

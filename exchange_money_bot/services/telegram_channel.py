@@ -27,6 +27,7 @@ class _ListingDisplay(Protocol):
     telegram_id: int
     description: Optional[str]
     payment_methods: Optional[list[str]]
+    listing_direction: str
 
 
 _MEMBER_OK = frozenset(
@@ -47,12 +48,20 @@ def _contact_url(offer: _ListingDisplay) -> str:
     return f"tg://user?id={offer.telegram_id}"
 
 
+def _offer_listing_direction(offer: _ListingDisplay) -> str:
+    d = getattr(offer, "listing_direction", None)
+    if d == sell_offers_service.LISTING_RIAL_TO_FX:
+        return sell_offers_service.LISTING_RIAL_TO_FX
+    return sell_offers_service.LISTING_FX_TO_RIAL
+
+
 def format_listing_html(
     offer: _ListingDisplay,
     *,
     closed: bool = False,
     closed_note_key: str = "listing.closed_note",
 ) -> str:
+    direction = _offer_listing_direction(offer)
     ccy_fa = sell_offers_service.currency_label_fa(offer.currency)
     name = html.escape(offer.seller_display_name.strip(), quote=False)
     ccy_esc = html.escape(ccy_fa, quote=False)
@@ -62,10 +71,18 @@ def format_listing_html(
         uname = f"@{html.escape(u, quote=False)}"
     else:
         uname = t("listing.no_username")
+    if direction == sell_offers_service.LISTING_RIAL_TO_FX:
+        header_key = "listing.header_rial_to_fx_html"
+        amount_key = "listing.amount_line_rial_to_fx"
+        tags_key = "listing.tags_template_rial_to_fx"
+    else:
+        header_key = "listing.header_fx_to_rial_html"
+        amount_key = "listing.amount_line_fx_to_rial"
+        tags_key = "listing.tags_template_fx_to_rial"
     parts: list[str] = [
-        t("listing.header_html"),
+        t(header_key),
         t(
-            "listing.amount_line",
+            amount_key,
             amount=offer.amount,
             ccy_fa=ccy_esc,
             currency=cur_esc,
@@ -92,7 +109,7 @@ def format_listing_html(
             t("listing.seller_line", name=name),
             t("listing.telegram_line", telegram_line=uname),
             "",
-            t("listing.tags_template", currency=offer.currency.upper()),
+            t(tags_key, currency=offer.currency.upper()),
         ]
     )
     body = "\n".join(parts)
@@ -102,14 +119,18 @@ def format_listing_html(
 
 
 def listing_contact_keyboard(offer: _ListingDisplay) -> InlineKeyboardMarkup:
+    direction = _offer_listing_direction(offer)
     ccy_fa = sell_offers_service.currency_label_fa(offer.currency)
-    label = t("listing.contact_btn", amount=offer.amount, ccy_fa=ccy_fa)
+    if direction == sell_offers_service.LISTING_RIAL_TO_FX:
+        label = t("listing.contact_btn_rial_to_fx", amount=offer.amount, ccy_fa=ccy_fa)
+    else:
+        label = t("listing.contact_btn", amount=offer.amount, ccy_fa=ccy_fa)
     max_len = TELEGRAM_INLINE_BUTTON_LABEL_MAX
     if len(label) > max_len:
         label = label[: max_len - 1] + "…"
     contact_btn = InlineKeyboardButton(label, url=_contact_url(offer))
     oid = getattr(offer, "id", None)
-    if oid is not None:
+    if oid is not None and direction == sell_offers_service.LISTING_FX_TO_RIAL:
         rial_lbl = t("listing.rial_btn")
         if len(rial_lbl) > max_len:
             rial_lbl = rial_lbl[: max_len - 1] + "…"

@@ -87,10 +87,21 @@ def main() -> None:
                     """
                     INSERT INTO sell_offers (
                         user_id, telegram_id, telegram_username,
-                        seller_display_name, amount, currency, description, payment_methods
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        seller_display_name, amount, currency, description, payment_methods,
+                        listing_direction
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (uid, tid, username, first_name, amount, currency, None, demo_pay),
+                    (
+                        uid,
+                        tid,
+                        username,
+                        first_name,
+                        amount,
+                        currency,
+                        None,
+                        demo_pay,
+                        "fx_to_rial",
+                    ),
                 )
         conn.commit()
     finally:

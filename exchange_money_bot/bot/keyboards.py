@@ -26,6 +26,12 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(t("keyboard.menu_fx"), callback_data="start:1")],
             [
                 InlineKeyboardButton(
+                    t("keyboard.menu_rial_to_fx"),
+                    callback_data="start:3",
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     t("keyboard.menu_my_offers"),
                     callback_data="account:manage",
                 )

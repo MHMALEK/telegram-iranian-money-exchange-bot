@@ -38,6 +38,25 @@ _PAYMENT_TOGGLE_PATTERN = (
 )
 
 
+def _listing_direction(context: ContextTypes.DEFAULT_TYPE) -> str:
+    v = context.user_data.get("listing_direction")
+    if v == sell_offers_service.LISTING_RIAL_TO_FX:
+        return sell_offers_service.LISTING_RIAL_TO_FX
+    return sell_offers_service.LISTING_FX_TO_RIAL
+
+
+def _amount_prompt_text(context: ContextTypes.DEFAULT_TYPE) -> str:
+    if _listing_direction(context) == sell_offers_service.LISTING_RIAL_TO_FX:
+        return t("sell.amount_prompt_rial_to_fx")
+    return t("sell.amount_prompt")
+
+
+def _amount_reply_parse_mode(context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
+    if _listing_direction(context) == sell_offers_service.LISTING_RIAL_TO_FX:
+        return "HTML"
+    return None
+
+
 async def _end_sell_if_not_member(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> Optional[int]:
@@ -174,6 +193,7 @@ def _sell_summary_text(
     uname: str,
     description: Optional[str],
     payment_methods: list[str],
+    listing_direction: str,
 ) -> str:
     if description:
         desc_block = t("sell.summary_description", desc=description)
@@ -183,8 +203,13 @@ def _sell_summary_text(
         "sell.summary_payment",
         methods=sell_offers_service.format_payment_methods_summary_fa(payment_methods),
     )
+    summary_key = (
+        "sell.summary_rial_to_fx"
+        if listing_direction == sell_offers_service.LISTING_RIAL_TO_FX
+        else "sell.summary_fx_to_rial"
+    )
     return t(
-        "sell.summary",
+        summary_key,
         amount=amount,
         currency_label=_currency_label(code),
         display_name=display_name,
@@ -221,9 +246,15 @@ async def sell_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.pop("sell_currency", None)
     context.user_data.pop("sell_description", None)
     context.user_data.pop("sell_payment_methods", None)
+    context.user_data.pop("listing_direction", None)
+    if query.data == "start:3":
+        context.user_data["listing_direction"] = sell_offers_service.LISTING_RIAL_TO_FX
+    else:
+        context.user_data["listing_direction"] = sell_offers_service.LISTING_FX_TO_RIAL
     await query.message.reply_text(
-        t("sell.amount_prompt"),
+        _amount_prompt_text(context),
         reply_markup=with_back_to_main(InlineKeyboardMarkup([])),
+        parse_mode=_amount_reply_parse_mode(context),
     )
     return SELL_AMOUNT
 
@@ -240,11 +271,17 @@ async def sell_receive_amount(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(
             t("sell.amount_invalid"),
             reply_markup=with_back_to_main(InlineKeyboardMarkup([])),
+            parse_mode=_amount_reply_parse_mode(context),
         )
         return SELL_AMOUNT
     context.user_data["sell_amount"] = amount
+    pick_key = (
+        "sell.pick_currency_rial_to_fx"
+        if _listing_direction(context) == sell_offers_service.LISTING_RIAL_TO_FX
+        else "sell.pick_currency"
+    )
     await update.message.reply_text(
-        t("sell.pick_currency"),
+        t(pick_key),
         reply_markup=_currency_keyboard(),
     )
     return SELL_CURRENCY
@@ -255,8 +292,13 @@ async def sell_currency_reminder(update: Update, context: ContextTypes.DEFAULT_T
     if end is not None:
         return end
     if update.message:
+        rem_key = (
+            "sell.currency_reminder_rial_to_fx"
+            if _listing_direction(context) == sell_offers_service.LISTING_RIAL_TO_FX
+            else "sell.currency_reminder"
+        )
         await update.message.reply_text(
-            t("sell.currency_reminder"),
+            t(rem_key),
             reply_markup=_currency_keyboard(),
         )
     return SELL_CURRENCY
@@ -418,6 +460,7 @@ async def sell_payment_done(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             uname=uname,
             description=description,
             payment_methods=normalized,
+            listing_direction=_listing_direction(context),
         ),
         reply_markup=_confirm_keyboard(),
     )
@@ -483,6 +526,7 @@ async def sell_confirm_reminder(update: Update, context: ContextTypes.DEFAULT_TY
                         uname=uname,
                         description=desc if desc else None,
                         payment_methods=pm_norm,
+                        listing_direction=_listing_direction(context),
                     ),
                     reply_markup=_confirm_keyboard(),
                 )
@@ -567,6 +611,7 @@ async def sell_submit_or_abort(update: Update, context: ContextTypes.DEFAULT_TYP
                 currency=currency,
                 description=description,
                 payment_methods=payment_methods,
+                listing_direction=_listing_direction(context),
             )
         except ValueError as e:
             logger.warning("sell offer validation: %s", e)
@@ -584,14 +629,20 @@ async def sell_submit_or_abort(update: Update, context: ContextTypes.DEFAULT_TYP
             await sell_offers_service.set_listings_channel_message_id(
                 session, offer.id, listing_mid
             )
+    saved_direction = _listing_direction(context)
     context.user_data.clear()
     if settings.effective_listings_channel_id():
         channel_note = t("sell.success_channel_on_html")
     else:
         channel_note = t("sell.success_channel_off")
+    succ_key = (
+        "sell.success_intro_rial_to_fx"
+        if saved_direction == sell_offers_service.LISTING_RIAL_TO_FX
+        else "sell.success_intro_fx_to_rial"
+    )
     await query.message.reply_text(
         t(
-            "sell.success_intro",
+            succ_key,
             amount=amount,
             currency_label=_currency_label(currency),
             channel_note=channel_note,
@@ -607,6 +658,7 @@ async def sell_conversation_cancel(update: Update, context: ContextTypes.DEFAULT
     context.user_data.pop("sell_currency", None)
     context.user_data.pop("sell_description", None)
     context.user_data.pop("sell_payment_methods", None)
+    context.user_data.pop("listing_direction", None)
     if update.message:
         await update.message.reply_text(
             t("sell.cancelled_cmd"),
@@ -624,6 +676,7 @@ async def sell_buy_flow_fallback(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data.pop("sell_currency", None)
     context.user_data.pop("sell_description", None)
     context.user_data.pop("sell_payment_methods", None)
+    context.user_data.pop("listing_direction", None)
     from exchange_money_bot.bot.main import execute_buy_flow_callback
 
     await execute_buy_flow_callback(query, context.bot)
@@ -639,6 +692,7 @@ async def sell_menu_main(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     context.user_data.pop("sell_currency", None)
     context.user_data.pop("sell_description", None)
     context.user_data.pop("sell_payment_methods", None)
+    context.user_data.pop("listing_direction", None)
     from exchange_money_bot.bot.main import apply_home_screen
 
     await apply_home_screen(query, context.bot)
@@ -655,7 +709,9 @@ def build_sell_conversation_handler() -> ConversationHandler:
         pattern=r"^buy:(choose|ccy:(EUR|USD)|cat:(EUR|USD):\d+)$",
     )
     return ConversationHandler(
-        entry_points=[CallbackQueryHandler(sell_entry, pattern=r"^start:1$")],
+        entry_points=[
+            CallbackQueryHandler(sell_entry, pattern=r"^start:(1|3)$"),
+        ],
         states={
             SELL_AMOUNT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, sell_receive_amount),

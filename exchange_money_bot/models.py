@@ -53,6 +53,14 @@ class SellOffer(Base):
     description: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     payment_methods: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
     """Accepted payment method codes (e.g. cash_in_person, bank); None on legacy rows."""
+    listing_direction: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default="fx_to_rial",
+        default="fx_to_rial",
+        index=True,
+    )
+    """fx_to_rial: sell FX for rial; rial_to_fx: offer rial to buy FX."""
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

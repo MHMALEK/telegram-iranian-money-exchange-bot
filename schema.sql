@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS sell_offers (
     description         VARCHAR(200),
     listings_channel_message_id BIGINT,
     payment_methods     JSONB,
+    listing_direction   VARCHAR(32) NOT NULL DEFAULT 'fx_to_rial',
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

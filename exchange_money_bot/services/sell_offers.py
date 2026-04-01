@@ -10,6 +10,12 @@ from exchange_money_bot.models import SellOffer
 ALLOWED_CURRENCIES = frozenset({"EUR", "USD"})
 MAX_OFFER_DESCRIPTION_LEN = 200
 
+# Listing semantics: fx_to_rial = selling EUR/USD for rial; rial_to_fx = offering rial to obtain EUR/USD.
+LISTING_FX_TO_RIAL = "fx_to_rial"
+LISTING_RIAL_TO_FX = "rial_to_fx"
+ALLOWED_LISTING_DIRECTIONS = frozenset({LISTING_FX_TO_RIAL, LISTING_RIAL_TO_FX})
+DEFAULT_LISTING_DIRECTION = LISTING_FX_TO_RIAL
+
 PAYMENT_CASH_IN_PERSON = "cash_in_person"
 PAYMENT_BANK = "bank"
 PAYMENT_CRYPTO = "crypto"
@@ -71,6 +77,7 @@ class DeletedSellOfferSnapshot:
     listings_channel_message_id: Optional[int]
     description: Optional[str] = None
     payment_methods: Optional[list[str]] = None
+    listing_direction: str = DEFAULT_LISTING_DIRECTION
 
 
 def currency_label_fa(code: str) -> str:
@@ -161,6 +168,9 @@ async def delete_offer_owned(
         listings_channel_message_id=row.listings_channel_message_id,
         description=getattr(row, "description", None),
         payment_methods=getattr(row, "payment_methods", None),
+        listing_direction=(
+            getattr(row, "listing_direction", None) or DEFAULT_LISTING_DIRECTION
+        ),
     )
     await session.delete(row)
     await session.commit()
@@ -189,11 +199,14 @@ async def create_sell_offer(
     currency: str,
     description: Optional[str] = None,
     payment_methods: Optional[Sequence[str]] = None,
+    listing_direction: str = DEFAULT_LISTING_DIRECTION,
 ) -> SellOffer:
     if currency not in ALLOWED_CURRENCIES:
         raise ValueError(f"Invalid currency: {currency}")
     if amount <= 0:
         raise ValueError("Amount must be positive")
+    if listing_direction not in ALLOWED_LISTING_DIRECTIONS:
+        raise ValueError(f"Invalid listing direction: {listing_direction}")
     desc = normalize_offer_description(description)
     methods = normalize_payment_methods(payment_methods)
     offer = SellOffer(
@@ -205,6 +218,7 @@ async def create_sell_offer(
         currency=currency,
         description=desc,
         payment_methods=methods,
+        listing_direction=listing_direction,
     )
     session.add(offer)
     await session.commit()

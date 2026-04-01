@@ -140,6 +140,9 @@ async def listing_rial_callback(
     if offer is None:
         await query.answer(t("rates.listing_rial_gone"), show_alert=True)
         return
+    if getattr(offer, "listing_direction", None) == sell_offers_service.LISTING_RIAL_TO_FX:
+        await query.answer(t("rates.listing_rial_not_applicable"), show_alert=True)
+        return
     try:
         usd, eur, _ts = await irr_fiat_rates.get_usd_eur_rial_snapshot(
             usd_json_url=settings.irr_usd_json_url or irr_fiat_rates.DEFAULT_USD_JSON_URL,
@@ -329,6 +332,7 @@ async def delete_user_data(telegram_id: int, bot: Optional[Bot] = None) -> bool:
                 listings_channel_message_id=o.listings_channel_message_id,
                 description=o.description,
                 payment_methods=o.payment_methods,
+                listing_direction=o.listing_direction,
             )
             for o in offers
         ]
@@ -346,6 +350,12 @@ async def build_my_offers_ui(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
         lines.append(t("offers.empty"))
     else:
         for i, o in enumerate(offers, start=1):
+            ld = getattr(o, "listing_direction", None) or sell_offers_service.DEFAULT_LISTING_DIRECTION
+            kind_prefix = (
+                t("offers.kind_rial_to_fx")
+                if ld == sell_offers_service.LISTING_RIAL_TO_FX
+                else t("offers.kind_fx_to_rial")
+            )
             ccy = sell_offers_service.currency_label_fa(o.currency)
             dt = (
                 o.created_at.strftime("%Y-%m-%d %H:%M")
@@ -372,10 +382,16 @@ async def build_my_offers_ui(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
                             quote=False,
                         ),
                     )
+            line_key = (
+                "offers.line_html_rial_to_fx"
+                if ld == sell_offers_service.LISTING_RIAL_TO_FX
+                else "offers.line_html_fx_to_rial"
+            )
             lines.append(
                 t(
-                    "offers.line_html",
+                    line_key,
                     i=i,
+                    kind_prefix=kind_prefix,
                     amount=o.amount,
                     ccy=ccy,
                     dt=dt,

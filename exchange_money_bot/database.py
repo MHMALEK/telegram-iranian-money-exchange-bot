@@ -78,6 +78,30 @@ def _add_sell_offer_payment_methods_column(connection: Connection) -> None:
         )
 
 
+def _add_listing_direction_column(connection: Connection) -> None:
+    insp = inspect(connection)
+    if "sell_offers" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("sell_offers")}
+    if "listing_direction" in cols:
+        return
+    dialect = connection.dialect.name
+    if dialect == "sqlite":
+        connection.execute(
+            text(
+                "ALTER TABLE sell_offers ADD COLUMN listing_direction "
+                "VARCHAR(32) NOT NULL DEFAULT 'fx_to_rial'"
+            )
+        )
+    elif dialect in ("postgresql", "postgres"):
+        connection.execute(
+            text(
+                "ALTER TABLE sell_offers ADD COLUMN listing_direction "
+                "VARCHAR(32) NOT NULL DEFAULT 'fx_to_rial'"
+            )
+        )
+
+
 async def init_db() -> None:
     if settings.database_url.startswith("sqlite"):
         from pathlib import Path
@@ -88,3 +112,4 @@ async def init_db() -> None:
         await conn.run_sync(_add_listings_channel_message_id_column)
         await conn.run_sync(_add_sell_offer_description_column)
         await conn.run_sync(_add_sell_offer_payment_methods_column)
+        await conn.run_sync(_add_listing_direction_column)

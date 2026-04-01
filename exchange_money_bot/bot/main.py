@@ -76,7 +76,7 @@ async def _listings_channel_message_body_async(bot: Bot, *, for_rial: bool) -> s
         url_esc = html.escape(open_url, quote=True)
         label_esc = html.escape(t("listings.channel_link_label"), quote=False)
         return f'{base}\n\n<a href="{url_esc}">{label_esc}</a>'
-    if settings.telegram_listings_channel_id:
+    if settings.effective_listings_channel_id():
         return f"{base}\n\n{t('listings.cta_no_direct_link_html')}"
     return base
 

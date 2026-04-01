@@ -119,7 +119,7 @@ async def resolve_listings_channel_open_url(bot: Bot) -> Optional[str]:
     direct = settings.effective_listings_channel_open_url()
     if direct:
         return direct
-    cid = (settings.telegram_listings_channel_id or "").strip()
+    cid = (settings.effective_listings_channel_id() or "").strip()
     if not cid:
         return None
     try:
@@ -203,7 +203,7 @@ async def user_passes_membership_gate(bot: Bot, user_id: int) -> bool:
 
 
 async def post_offer_to_listings_channel(bot: Bot, offer: _ListingDisplay) -> Optional[int]:
-    cid = settings.telegram_listings_channel_id
+    cid = settings.effective_listings_channel_id()
     if not cid:
         return None
     text = format_listing_html(offer, closed=False)
@@ -230,7 +230,7 @@ async def mark_listing_closed_on_channel(
 ) -> None:
     if bot is None or message_id is None:
         return
-    cid = settings.telegram_listings_channel_id
+    cid = settings.effective_listings_channel_id()
     if not cid:
         return
     text = format_listing_html(offer, closed=True, closed_note_key=closed_note_key)

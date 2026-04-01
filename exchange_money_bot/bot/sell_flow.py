@@ -445,7 +445,7 @@ async def sell_submit_or_abort(update: Update, context: ContextTypes.DEFAULT_TYP
                 session, offer.id, listing_mid
             )
     context.user_data.clear()
-    if settings.telegram_listings_channel_id:
+    if settings.effective_listings_channel_id():
         channel_note = t("sell.success_channel_on_html")
     else:
         channel_note = t("sell.success_channel_off")

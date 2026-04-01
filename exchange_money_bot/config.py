@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     """Channel chat id (@username or -100…) where new sell offers are posted. Bot must be admin."""
 
     telegram_membership_channel_id: Optional[str] = None
-    """Optional override for membership checks; defaults to listings channel when unset."""
+    """Optional: different channel for membership checks (defaults to listings when unset). If listings id is unset, this id is also used to post listings and to resolve open-channel links (single-channel setup)."""
 
     telegram_membership_group_id: Optional[str] = None
     """Optional group or supergroup chat id (@username or -100…). Bot must be able to get_chat_member. Used with channel id as OR: user passes if member of any configured chat."""
@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     def effective_membership_channel_id(self) -> Optional[str]:
         return self.telegram_membership_channel_id or self.telegram_listings_channel_id
 
+    def effective_listings_channel_id(self) -> Optional[str]:
+        """Chat where listings are posted and where «open channel» should point. Listings id wins; else membership id."""
+        lid = (self.telegram_listings_channel_id or "").strip()
+        if lid:
+            return lid
+        mid = (self.telegram_membership_channel_id or "").strip()
+        return mid or None
+
     def effective_membership_group_id(self) -> Optional[str]:
         s = (self.telegram_membership_group_id or "").strip()
         return s or None
@@ -60,7 +68,7 @@ class Settings(BaseSettings):
             s = self.telegram_channel_invite_url.strip()
             if s:
                 return s
-        cid = (self.telegram_listings_channel_id or "").strip()
+        cid = (self.effective_listings_channel_id() or "").strip()
         if cid.startswith("@"):
             u = cid[1:].strip()
             if u:

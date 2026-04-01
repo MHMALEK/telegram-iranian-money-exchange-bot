@@ -71,15 +71,19 @@ jobs:
           script_stop: true
           script: |
             set -e
-            for v in TELEGRAM_BOT_TOKEN DATABASE_URL TELEGRAM_LISTINGS_CHANNEL_ID; do
+            for v in TELEGRAM_BOT_TOKEN DATABASE_URL; do
               eval "val=\$$v"
               if [ -z "$val" ]; then
                 echo "$v must be set (GitHub Actions secret)"
                 exit 1
               fi
             done
-            E="-e TELEGRAM_BOT_TOKEN -e DATABASE_URL -e TELEGRAM_LISTINGS_CHANNEL_ID"
-            for v in TELEGRAM_MEMBERSHIP_CHANNEL_ID TELEGRAM_MEMBERSHIP_GROUP_ID TELEGRAM_CHANNEL_INVITE_URL TELEGRAM_MEMBERSHIP_GROUP_INVITE_URL TELEGRAM_DISABLE_MEMBERSHIP_GATE API_BASE_URL IRR_RATES_TTL_SECONDS IRR_USD_JSON_URL IRR_EUR_JSON_URL; do
+            if [ -z "${TELEGRAM_LISTINGS_CHANNEL_ID:-}" ] && [ -z "${TELEGRAM_MEMBERSHIP_CHANNEL_ID:-}" ]; then
+              echo "Set TELEGRAM_LISTINGS_CHANNEL_ID and/or TELEGRAM_MEMBERSHIP_CHANNEL_ID"
+              exit 1
+            fi
+            E="-e TELEGRAM_BOT_TOKEN -e DATABASE_URL -e TELEGRAM_LISTINGS_CHANNEL_ID -e TELEGRAM_MEMBERSHIP_CHANNEL_ID"
+            for v in TELEGRAM_MEMBERSHIP_GROUP_ID TELEGRAM_CHANNEL_INVITE_URL TELEGRAM_MEMBERSHIP_GROUP_INVITE_URL TELEGRAM_DISABLE_MEMBERSHIP_GATE API_BASE_URL IRR_RATES_TTL_SECONDS IRR_USD_JSON_URL IRR_EUR_JSON_URL; do
               eval "val=\$$v"
               if [ -n "$val" ]; then
                 E="$E -e $v"

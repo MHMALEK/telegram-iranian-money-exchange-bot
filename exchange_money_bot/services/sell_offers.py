@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +9,19 @@ from exchange_money_bot.models import SellOffer
 
 ALLOWED_CURRENCIES = frozenset({"EUR", "USD"})
 MAX_OFFER_DESCRIPTION_LEN = 200
+
+PAYMENT_CASH_IN_PERSON = "cash_in_person"
+PAYMENT_BANK = "bank"
+PAYMENT_CRYPTO = "crypto"
+PAYMENT_OTHER = "other"
+
+PAYMENT_METHOD_CODES_ORDER: tuple[str, ...] = (
+    PAYMENT_CASH_IN_PERSON,
+    PAYMENT_BANK,
+    PAYMENT_CRYPTO,
+    PAYMENT_OTHER,
+)
+ALLOWED_PAYMENT_METHODS = frozenset(PAYMENT_METHOD_CODES_ORDER)
 
 
 def normalize_offer_description(raw: Optional[str]) -> Optional[str]:
@@ -23,6 +36,29 @@ def normalize_offer_description(raw: Optional[str]) -> Optional[str]:
     return s
 
 
+def normalize_payment_methods(raw: Optional[Sequence[str]]) -> list[str]:
+    """Deduplicate, keep canonical order; raises ValueError if empty or no valid codes."""
+    if raw is None:
+        raise ValueError("Payment methods required")
+    chosen = [c for c in PAYMENT_METHOD_CODES_ORDER if c in raw]
+    if not chosen:
+        raise ValueError("Invalid or empty payment methods")
+    return chosen
+
+
+def payment_method_label_fa(code: str) -> str:
+    return t(f"payment.{code}", default=code)
+
+
+def format_payment_methods_summary_fa(codes: Optional[Sequence[str]]) -> str:
+    if not codes:
+        return t("payment.summary_unspecified")
+    ordered = [c for c in PAYMENT_METHOD_CODES_ORDER if c in codes]
+    if not ordered:
+        return t("payment.summary_unspecified")
+    return "، ".join(payment_method_label_fa(c) for c in ordered)
+
+
 @dataclass
 class DeletedSellOfferSnapshot:
     """Row fields needed after an offer row is removed (e.g. channel strikethrough)."""
@@ -34,6 +70,7 @@ class DeletedSellOfferSnapshot:
     telegram_id: int
     listings_channel_message_id: Optional[int]
     description: Optional[str] = None
+    payment_methods: Optional[list[str]] = None
 
 
 def currency_label_fa(code: str) -> str:
@@ -123,6 +160,7 @@ async def delete_offer_owned(
         telegram_id=row.telegram_id,
         listings_channel_message_id=row.listings_channel_message_id,
         description=getattr(row, "description", None),
+        payment_methods=getattr(row, "payment_methods", None),
     )
     await session.delete(row)
     await session.commit()
@@ -150,12 +188,14 @@ async def create_sell_offer(
     amount: int,
     currency: str,
     description: Optional[str] = None,
+    payment_methods: Optional[Sequence[str]] = None,
 ) -> SellOffer:
     if currency not in ALLOWED_CURRENCIES:
         raise ValueError(f"Invalid currency: {currency}")
     if amount <= 0:
         raise ValueError("Amount must be positive")
     desc = normalize_offer_description(description)
+    methods = normalize_payment_methods(payment_methods)
     offer = SellOffer(
         user_id=user_id,
         telegram_id=telegram_id,
@@ -164,6 +204,7 @@ async def create_sell_offer(
         amount=amount,
         currency=currency,
         description=desc,
+        payment_methods=methods,
     )
     session.add(offer)
     await session.commit()

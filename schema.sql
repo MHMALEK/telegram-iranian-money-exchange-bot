@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS sell_offers (
     seller_display_name TEXT NOT NULL,
     amount              BIGINT NOT NULL,
     currency            VARCHAR(8) NOT NULL,
+    description         VARCHAR(200),
+    listings_channel_message_id BIGINT,
+    payment_methods     JSONB,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

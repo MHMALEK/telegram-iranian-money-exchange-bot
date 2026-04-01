@@ -4,6 +4,12 @@ STRINGS: dict[str, str] = {
     # Currency labels (used by sell_offers.currency_label_fa)
     "currency.EUR": "یورو",
     "currency.USD": "دلار",
+    # Payment methods (sell flow + listings)
+    "payment.cash_in_person": "نقدی و حضوری",
+    "payment.bank": "پرداخت بانکی",
+    "payment.crypto": "کریپتو",
+    "payment.other": "سایر روش‌ها",
+    "payment.summary_unspecified": "—",
     # Main menu & navigation
     "keyboard.back_main": "بازگشت به منوی اصلی",
     "keyboard.menu_rial": "مشاهده لیست فروشندگان ارز",
@@ -63,6 +69,7 @@ STRINGS: dict[str, str] = {
     "listing.header_html": "💱 <b>آگهی فروش ارز</b>",
     "listing.amount_line": "💰 مبلغ: <b>{amount:,}</b> {ccy_fa} ({currency})",
     "listing.description_line": "📝 <b>توضیحات:</b> {text}",
+    "listing.payment_line": "💳 <b>نحوه پرداخت:</b> {text}",
     "listing.seller_line": "👤 فروشنده: {name}",
     "listing.telegram_line": "📱 تلگرام: {telegram_line}",
     "listing.tags_template": "🏷 #{currency} #فروش",
@@ -122,7 +129,8 @@ STRINGS: dict[str, str] = {
     # My offers UI
     "offers.title_html": "<b>آگهی‌های فروش من</b>",
     "offers.empty": "هنوز آگهی فعالی ثبت نکرده‌اید.",
-    "offers.line_html": "{i}) مبلغ <b>{amount:,}</b> {ccy} — ثبت: {dt}{desc_suffix}",
+    "offers.line_html": "{i}) مبلغ <b>{amount:,}</b> {ccy} — ثبت: {dt}{desc_suffix}{pay_suffix}",
+    "offers.payment_line_html": "\n   💳 <i>{methods}</i>",
     "offers.desc_line_html": "\n   📝 <i>{snippet}</i>",
     "offers.btn_remove_i": "{i}) حذف",
     "offers.btn_sold_i": "{i}) فروش رفت",
@@ -160,13 +168,22 @@ STRINGS: dict[str, str] = {
         "لطفاً فقط متن توضیحات را بفرستید (حداکثر {max} کاراکتر) یا «بدون توضیح» را بزنید."
     ),
     "sell.btn_desc_skip": "بدون توضیح",
+    "sell.payment_prompt": (
+        "<b>نحوه پرداخت</b> را مشخص کنید (می‌توانید چند گزینه را با هم انتخاب کنید):\n\n"
+        "روی هر مورد بزنید تا فعال/غیرفعال شود؛ وقتی تمام شد «ادامه» را بزنید."
+    ),
+    "sell.payment_reminder": "لطفاً فقط با دکمه‌های زیر روش‌های پرداخت را انتخاب کنید و سپس «ادامه» را بزنید.",
+    "sell.payment_btn_done": "ادامه",
+    "sell.payment_need_one": "حداقل یک روش پرداخت را انتخاب کنید.",
     "sell.summary_description": "توضیحات: {desc}",
     "sell.summary_no_description": "توضیحات: —",
+    "sell.summary_payment": "نحوه پرداخت: {methods}",
     "sell.summary": (
         "خلاصهٔ آگهی فروش:\n\n"
         "مبلغ: {amount:,}\n"
         "ارز: {currency_label}\n"
         "{description_block}\n"
+        "{payment_block}\n"
         "نام نمایشی: {display_name}\n"
         "یوزرنیم تلگرام: {uname}\n\n"
         "برای انصراف «انصراف» را بزنید؛ اگر درست است «تایید و ثبت»."

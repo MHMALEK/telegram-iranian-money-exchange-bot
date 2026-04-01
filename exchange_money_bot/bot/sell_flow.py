@@ -29,9 +29,13 @@ from exchange_money_bot.services import users as user_service
 
 logger = logging.getLogger(__name__)
 
-SELL_AMOUNT, SELL_CURRENCY, SELL_DESCRIPTION, SELL_CONFIRM = range(4)
+SELL_AMOUNT, SELL_CURRENCY, SELL_DESCRIPTION, SELL_PAYMENT, SELL_CONFIRM = range(5)
 
 MAX_DESCRIPTION_LEN = sell_offers_service.MAX_OFFER_DESCRIPTION_LEN
+
+_PAYMENT_TOGGLE_PATTERN = (
+    r"^sell:pay:(cash_in_person|bank|crypto|other)$"
+)
 
 
 async def _end_sell_if_not_member(
@@ -116,6 +120,52 @@ def _confirm_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def _payment_codes_from_user_data(context: ContextTypes.DEFAULT_TYPE) -> list[str]:
+    raw = context.user_data.get("sell_payment_methods")
+    if not isinstance(raw, list):
+        return []
+    return [c for c in raw if isinstance(c, str)]
+
+
+def _payment_keyboard(selected: list[str]) -> InlineKeyboardMarkup:
+    sel_set = set(selected)
+
+    def lbl(code: str) -> str:
+        mark = "✓ " if code in sel_set else "○ "
+        return mark + sell_offers_service.payment_method_label_fa(code)
+
+    codes = sell_offers_service.PAYMENT_METHOD_CODES_ORDER
+    return with_back_to_main(
+        InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(lbl(codes[0]), callback_data=f"sell:pay:{codes[0]}"),
+                    InlineKeyboardButton(lbl(codes[1]), callback_data=f"sell:pay:{codes[1]}"),
+                ],
+                [
+                    InlineKeyboardButton(lbl(codes[2]), callback_data=f"sell:pay:{codes[2]}"),
+                    InlineKeyboardButton(lbl(codes[3]), callback_data=f"sell:pay:{codes[3]}"),
+                ],
+                [
+                    InlineKeyboardButton(
+                        t("sell.payment_btn_done"),
+                        callback_data="sell:pay:done",
+                    ),
+                ],
+            ]
+        )
+    )
+
+
+async def _send_payment_prompt(message, context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data["sell_payment_methods"] = []
+    await message.reply_text(
+        t("sell.payment_prompt"),
+        reply_markup=_payment_keyboard([]),
+        parse_mode="HTML",
+    )
+
+
 def _sell_summary_text(
     *,
     amount: int,
@@ -123,11 +173,16 @@ def _sell_summary_text(
     display_name: str,
     uname: str,
     description: Optional[str],
+    payment_methods: list[str],
 ) -> str:
     if description:
         desc_block = t("sell.summary_description", desc=description)
     else:
         desc_block = t("sell.summary_no_description")
+    pay_block = t(
+        "sell.summary_payment",
+        methods=sell_offers_service.format_payment_methods_summary_fa(payment_methods),
+    )
     return t(
         "sell.summary",
         amount=amount,
@@ -135,6 +190,7 @@ def _sell_summary_text(
         display_name=display_name,
         uname=uname,
         description_block=desc_block,
+        payment_block=pay_block,
     )
 
 
@@ -164,6 +220,7 @@ async def sell_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.pop("sell_amount", None)
     context.user_data.pop("sell_currency", None)
     context.user_data.pop("sell_description", None)
+    context.user_data.pop("sell_payment_methods", None)
     await query.message.reply_text(
         t("sell.amount_prompt"),
         reply_markup=with_back_to_main(InlineKeyboardMarkup([])),
@@ -229,12 +286,6 @@ async def sell_currency_chosen(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         context.user_data.clear()
         return ConversationHandler.END
-    display_name = query.from_user.full_name or t("sell.display_fallback")
-    uname = (
-        f"@{query.from_user.username}"
-        if query.from_user.username
-        else t("sell.username_none")
-    )
     await query.message.reply_text(
         t("sell.description_prompt", max=MAX_DESCRIPTION_LEN),
         reply_markup=_description_keyboard(),
@@ -261,23 +312,8 @@ async def sell_description_skip(update: Update, context: ContextTypes.DEFAULT_TY
         context.user_data.clear()
         return ConversationHandler.END
     context.user_data["sell_description"] = None
-    display_name = query.from_user.full_name or t("sell.display_fallback")
-    uname = (
-        f"@{query.from_user.username}"
-        if query.from_user.username
-        else t("sell.username_none")
-    )
-    await query.message.reply_text(
-        _sell_summary_text(
-            amount=amount,
-            code=code,
-            display_name=display_name,
-            uname=uname,
-            description=None,
-        ),
-        reply_markup=_confirm_keyboard(),
-    )
-    return SELL_CONFIRM
+    await _send_payment_prompt(query.message, context)
+    return SELL_PAYMENT
 
 
 async def sell_receive_description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -310,22 +346,95 @@ async def sell_receive_description(update: Update, context: ContextTypes.DEFAULT
         context.user_data.clear()
         return ConversationHandler.END
     context.user_data["sell_description"] = text
-    u = update.effective_user
-    display_name = (u.full_name if u else None) or t("sell.display_fallback")
-    uname = (
-        f"@{u.username}" if u and u.username else t("sell.username_none")
-    )
-    await update.message.reply_text(
+    await _send_payment_prompt(update.message, context)
+    return SELL_PAYMENT
+
+
+async def sell_payment_toggle(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+    query = update.callback_query
+    if query is None or query.message is None or query.data is None:
+        return ConversationHandler.END
+    end = await _end_sell_if_not_member(update, context)
+    if end is not None:
+        await query.answer()
+        return end
+    await query.answer()
+    parts = query.data.split(":")
+    if len(parts) != 3 or parts[0] != "sell" or parts[1] != "pay":
+        return SELL_PAYMENT
+    code = parts[2]
+    if code not in sell_offers_service.ALLOWED_PAYMENT_METHODS:
+        return SELL_PAYMENT
+    sel = _payment_codes_from_user_data(context)
+    if code in sel:
+        sel = [c for c in sel if c != code]
+    else:
+        sel = [*sel, code]
+    context.user_data["sell_payment_methods"] = sel
+    try:
+        await query.edit_message_reply_markup(reply_markup=_payment_keyboard(sel))
+    except Exception:
+        logger.debug("edit_message_reply_markup failed (payment toggles)", exc_info=True)
+    return SELL_PAYMENT
+
+
+async def sell_payment_done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    if query is None or query.message is None or query.from_user is None:
+        return ConversationHandler.END
+    end = await _end_sell_if_not_member(update, context)
+    if end is not None:
+        await query.answer()
+        return end
+    sel = _payment_codes_from_user_data(context)
+    try:
+        normalized = sell_offers_service.normalize_payment_methods(sel)
+    except ValueError:
+        await query.answer(t("sell.payment_need_one"), show_alert=True)
+        return SELL_PAYMENT
+    await query.answer()
+    context.user_data["sell_payment_methods"] = normalized
+    amount = context.user_data.get("sell_amount")
+    code = context.user_data.get("sell_currency")
+    if not isinstance(amount, int) or not isinstance(code, str):
+        await query.message.reply_text(
+            t("error.amount_lost"),
+            reply_markup=main_menu_keyboard(),
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
+    desc_raw = context.user_data.get("sell_description")
+    description = desc_raw if isinstance(desc_raw, str) else None
+    u = query.from_user
+    display_name = u.full_name or t("sell.display_fallback")
+    uname = f"@{u.username}" if u.username else t("sell.username_none")
+    await query.message.reply_text(
         _sell_summary_text(
             amount=amount,
             code=code,
             display_name=display_name,
             uname=uname,
-            description=text,
+            description=description,
+            payment_methods=normalized,
         ),
         reply_markup=_confirm_keyboard(),
     )
     return SELL_CONFIRM
+
+
+async def sell_payment_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    end = await _end_sell_if_not_member(update, context)
+    if end is not None:
+        return end
+    if update.message:
+        sel = _payment_codes_from_user_data(context)
+        await update.message.reply_text(
+            t("sell.payment_reminder"),
+            reply_markup=_payment_keyboard(sel),
+        )
+    return SELL_PAYMENT
 
 
 async def sell_description_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -348,27 +457,40 @@ async def sell_confirm_reminder(update: Update, context: ContextTypes.DEFAULT_TY
         amount = context.user_data.get("sell_amount")
         code = context.user_data.get("sell_currency")
         desc = context.user_data.get("sell_description")
+        pm = _payment_codes_from_user_data(context)
         u = update.effective_user
         if (
             isinstance(amount, int)
             and isinstance(code, str)
             and u is not None
             and (desc is None or isinstance(desc, str))
+            and pm
         ):
-            display_name = u.full_name or t("sell.display_fallback")
-            uname = (
-                f"@{u.username}" if u.username else t("sell.username_none")
-            )
-            await update.message.reply_text(
-                _sell_summary_text(
-                    amount=amount,
-                    code=code,
-                    display_name=display_name,
-                    uname=uname,
-                    description=desc if desc else None,
-                ),
-                reply_markup=_confirm_keyboard(),
-            )
+            try:
+                pm_norm = sell_offers_service.normalize_payment_methods(pm)
+            except ValueError:
+                pm_norm = None
+            if pm_norm:
+                display_name = u.full_name or t("sell.display_fallback")
+                uname = (
+                    f"@{u.username}" if u.username else t("sell.username_none")
+                )
+                await update.message.reply_text(
+                    _sell_summary_text(
+                        amount=amount,
+                        code=code,
+                        display_name=display_name,
+                        uname=uname,
+                        description=desc if desc else None,
+                        payment_methods=pm_norm,
+                    ),
+                    reply_markup=_confirm_keyboard(),
+                )
+            else:
+                await update.message.reply_text(
+                    t("sell.confirm_reminder"),
+                    reply_markup=_confirm_keyboard(),
+                )
         else:
             await update.message.reply_text(
                 t("sell.confirm_reminder"),
@@ -417,6 +539,23 @@ async def sell_submit_or_abort(update: Update, context: ContextTypes.DEFAULT_TYP
         display_name = u.full_name or (db_user.first_name or "—")
         desc_raw = context.user_data.get("sell_description")
         description = desc_raw if isinstance(desc_raw, str) else None
+        pm_raw = context.user_data.get("sell_payment_methods")
+        if not isinstance(pm_raw, list) or not pm_raw:
+            await query.message.reply_text(
+                t("error.data_lost"),
+                reply_markup=main_menu_keyboard(),
+            )
+            context.user_data.clear()
+            return ConversationHandler.END
+        try:
+            payment_methods = sell_offers_service.normalize_payment_methods(pm_raw)
+        except ValueError:
+            await query.message.reply_text(
+                t("error.data_lost"),
+                reply_markup=main_menu_keyboard(),
+            )
+            context.user_data.clear()
+            return ConversationHandler.END
         try:
             offer = await sell_offers_service.create_sell_offer(
                 session,
@@ -427,6 +566,7 @@ async def sell_submit_or_abort(update: Update, context: ContextTypes.DEFAULT_TYP
                 amount=amount,
                 currency=currency,
                 description=description,
+                payment_methods=payment_methods,
             )
         except ValueError as e:
             logger.warning("sell offer validation: %s", e)
@@ -466,6 +606,7 @@ async def sell_conversation_cancel(update: Update, context: ContextTypes.DEFAULT
     context.user_data.pop("sell_amount", None)
     context.user_data.pop("sell_currency", None)
     context.user_data.pop("sell_description", None)
+    context.user_data.pop("sell_payment_methods", None)
     if update.message:
         await update.message.reply_text(
             t("sell.cancelled_cmd"),
@@ -482,6 +623,7 @@ async def sell_buy_flow_fallback(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data.pop("sell_amount", None)
     context.user_data.pop("sell_currency", None)
     context.user_data.pop("sell_description", None)
+    context.user_data.pop("sell_payment_methods", None)
     from exchange_money_bot.bot.main import execute_buy_flow_callback
 
     await execute_buy_flow_callback(query, context.bot)
@@ -496,6 +638,7 @@ async def sell_menu_main(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     context.user_data.pop("sell_amount", None)
     context.user_data.pop("sell_currency", None)
     context.user_data.pop("sell_description", None)
+    context.user_data.pop("sell_payment_methods", None)
     from exchange_money_bot.bot.main import apply_home_screen
 
     await apply_home_screen(query, context.bot)
@@ -528,6 +671,12 @@ def build_sell_conversation_handler() -> ConversationHandler:
                 CallbackQueryHandler(sell_description_skip, pattern=r"^sell:desc:skip$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, sell_receive_description),
                 MessageHandler(~filters.COMMAND, sell_description_reminder),
+            ],
+            SELL_PAYMENT: [
+                CallbackQueryHandler(sell_payment_done, pattern=r"^sell:pay:done$"),
+                CallbackQueryHandler(sell_payment_toggle, pattern=_PAYMENT_TOGGLE_PATTERN),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, sell_payment_reminder),
+                MessageHandler(~filters.COMMAND, sell_payment_reminder),
             ],
             SELL_CONFIRM: [
                 CallbackQueryHandler(

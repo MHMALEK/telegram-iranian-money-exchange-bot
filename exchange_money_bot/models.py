@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, JSON, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -51,6 +51,8 @@ class SellOffer(Base):
     amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False, index=True)
     description: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    payment_methods: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
+    """Accepted payment method codes (e.g. cash_in_person, bank); None on legacy rows."""
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

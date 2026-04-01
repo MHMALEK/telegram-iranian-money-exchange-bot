@@ -62,6 +62,22 @@ def _add_sell_offer_description_column(connection: Connection) -> None:
         connection.execute(text("ALTER TABLE sell_offers ADD COLUMN description VARCHAR(200)"))
 
 
+def _add_sell_offer_payment_methods_column(connection: Connection) -> None:
+    insp = inspect(connection)
+    if "sell_offers" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("sell_offers")}
+    if "payment_methods" in cols:
+        return
+    dialect = connection.dialect.name
+    if dialect == "sqlite":
+        connection.execute(text("ALTER TABLE sell_offers ADD COLUMN payment_methods TEXT"))
+    elif dialect in ("postgresql", "postgres"):
+        connection.execute(
+            text("ALTER TABLE sell_offers ADD COLUMN payment_methods JSONB")
+        )
+
+
 async def init_db() -> None:
     if settings.database_url.startswith("sqlite"):
         from pathlib import Path
@@ -71,3 +87,4 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_add_listings_channel_message_id_column)
         await conn.run_sync(_add_sell_offer_description_column)
+        await conn.run_sync(_add_sell_offer_payment_methods_column)

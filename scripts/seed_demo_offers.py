@@ -13,6 +13,7 @@ Each run deletes and recreates the demo users and their offers.
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import sys
@@ -80,15 +81,16 @@ def main() -> None:
                 (tid, username, first_name),
             )
             uid = cur.lastrowid
+            demo_pay = json.dumps(["cash_in_person", "bank"])
             for amount, currency in offers:
                 conn.execute(
                     """
                     INSERT INTO sell_offers (
                         user_id, telegram_id, telegram_username,
-                        seller_display_name, amount, currency, description
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        seller_display_name, amount, currency, description, payment_methods
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (uid, tid, username, first_name, amount, currency, None),
+                    (uid, tid, username, first_name, amount, currency, None, demo_pay),
                 )
         conn.commit()
     finally:

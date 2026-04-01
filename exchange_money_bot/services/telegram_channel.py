@@ -26,6 +26,7 @@ class _ListingDisplay(Protocol):
     telegram_username: Optional[str]
     telegram_id: int
     description: Optional[str]
+    payment_methods: Optional[list[str]]
 
 
 _MEMBER_OK = frozenset(
@@ -74,6 +75,18 @@ def format_listing_html(
     if desc_raw and str(desc_raw).strip():
         desc_esc = html.escape(str(desc_raw).strip(), quote=False)
         parts.append(t("listing.description_line", text=desc_esc))
+    pm = offer.payment_methods
+    if pm:
+        ordered = [
+            c for c in sell_offers_service.PAYMENT_METHOD_CODES_ORDER if c in pm
+        ]
+        if ordered:
+            pm_plain = "، ".join(
+                sell_offers_service.payment_method_label_fa(c) for c in ordered
+            )
+            parts.append(
+                t("listing.payment_line", text=html.escape(pm_plain, quote=False))
+            )
     parts.extend(
         [
             t("listing.seller_line", name=name),

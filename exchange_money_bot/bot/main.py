@@ -328,6 +328,7 @@ async def delete_user_data(telegram_id: int, bot: Optional[Bot] = None) -> bool:
                 telegram_id=o.telegram_id,
                 listings_channel_message_id=o.listings_channel_message_id,
                 description=o.description,
+                payment_methods=o.payment_methods,
             )
             for o in offers
         ]
@@ -357,6 +358,20 @@ async def build_my_offers_ui(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
                 if len(str(o.description).strip()) > 72:
                     snippet += "…"
                 desc_suffix = t("offers.desc_line_html", snippet=snippet)
+            pay_suffix = ""
+            pm = o.payment_methods
+            if pm:
+                ordered = [
+                    c for c in sell_offers_service.PAYMENT_METHOD_CODES_ORDER if c in pm
+                ]
+                if ordered:
+                    pay_suffix = t(
+                        "offers.payment_line_html",
+                        methods=html.escape(
+                            sell_offers_service.format_payment_methods_summary_fa(pm),
+                            quote=False,
+                        ),
+                    )
             lines.append(
                 t(
                     "offers.line_html",
@@ -365,6 +380,7 @@ async def build_my_offers_ui(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
                     ccy=ccy,
                     dt=dt,
                     desc_suffix=desc_suffix,
+                    pay_suffix=pay_suffix,
                 )
             )
             rows.append(

@@ -4,6 +4,7 @@
 # Env vars pass through SSH into `docker run -e NAME` (values not embedded in script).
 #
 # After first push: Packages → image → Package settings → Change visibility → Public
+# Deploy assumes the GHCR package is public so the VPS can `docker pull` without login.
 #
 name: Build and deploy
 
@@ -80,7 +81,8 @@ jobs:
               exit 1
             fi
             if [ -z "${TELEGRAM_LISTINGS_CHANNEL_ID:-}" ]; then
-              echo "TELEGRAM_LISTINGS_CHANNEL_ID must be set (required for listings)"
+              echo "TELEGRAM_LISTINGS_CHANNEL_ID must be set in GitHub Actions secrets (required for listings)."
+              echo "If you only had TELEGRAM_MEMBERSHIP_CHANNEL_ID before, add TELEGRAM_LISTINGS_CHANNEL_ID with your listings channel id (often the same -100… value)."
               exit 1
             fi
             E="-e TELEGRAM_BOT_TOKEN -e DATABASE_URL -e TELEGRAM_LISTINGS_CHANNEL_ID"
@@ -93,6 +95,7 @@ jobs:
             [ -n "${IRR_RATES_TTL_SECONDS:-}" ] && E="$E -e IRR_RATES_TTL_SECONDS"
             [ -n "${IRR_USD_JSON_URL:-}" ] && E="$E -e IRR_USD_JSON_URL"
             [ -n "${IRR_EUR_JSON_URL:-}" ] && E="$E -e IRR_EUR_JSON_URL"
+            # Public GHCR image: anonymous pull on the VPS (no docker login).
             docker pull "${{ env.IMAGE_NAME }}:latest"
             docker stop exchange-money-bot 2>/dev/null || true
             docker rm exchange-money-bot 2>/dev/null || true

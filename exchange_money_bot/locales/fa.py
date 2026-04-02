@@ -12,7 +12,7 @@ STRINGS: dict[str, str] = {
     "payment.summary_unspecified": "—",
     # Main menu & navigation
     "keyboard.back_main": "بازگشت به منوی اصلی",
-    "keyboard.menu_rial": "مشاهده لیست فروشندگان ارز",
+    "keyboard.menu_rial": "مشاهده همه آگهی‌ها",
     "keyboard.menu_fx": "ایجاد آگهی برای تبدیل ارز به ریال",
     "keyboard.menu_rial_to_fx": "ایجاد آگهی برای تبدیل ریال به ارز",
     "keyboard.menu_spot_rates": "قیمت لحظه‌ای دلار و یورو (ریال)",

@@ -248,9 +248,25 @@ async def sell_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.pop("sell_payment_methods", None)
     context.user_data.pop("listing_direction", None)
     if query.data == "start:3":
-        context.user_data["listing_direction"] = sell_offers_service.LISTING_RIAL_TO_FX
+        chosen_direction = sell_offers_service.LISTING_RIAL_TO_FX
     else:
-        context.user_data["listing_direction"] = sell_offers_service.LISTING_FX_TO_RIAL
+        chosen_direction = sell_offers_service.LISTING_FX_TO_RIAL
+    async with async_session_factory() as session:
+        already_has = await sell_offers_service.has_open_offer_with_direction(
+            session, query.from_user.id, chosen_direction
+        )
+    if already_has:
+        dup_key = (
+            "sell.duplicate_direction_rial_to_fx"
+            if chosen_direction == sell_offers_service.LISTING_RIAL_TO_FX
+            else "sell.duplicate_direction_fx_to_rial"
+        )
+        await query.message.reply_text(
+            t(dup_key),
+            reply_markup=main_menu_keyboard(),
+        )
+        return ConversationHandler.END
+    context.user_data["listing_direction"] = chosen_direction
     await query.message.reply_text(
         _amount_prompt_text(context),
         reply_markup=with_back_to_main(InlineKeyboardMarkup([])),

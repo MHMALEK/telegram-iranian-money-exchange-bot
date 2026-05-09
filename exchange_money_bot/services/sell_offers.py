@@ -188,6 +188,19 @@ async def set_listings_channel_message_id(
     await session.commit()
 
 
+async def has_open_offer_with_direction(
+    session: AsyncSession,
+    telegram_id: int,
+    listing_direction: str,
+) -> bool:
+    stmt = select(func.count()).select_from(SellOffer).where(
+        SellOffer.telegram_id == telegram_id,
+        SellOffer.listing_direction == listing_direction,
+    )
+    result = await session.execute(stmt)
+    return int(result.scalar_one()) > 0
+
+
 async def create_sell_offer(
     session: AsyncSession,
     *,

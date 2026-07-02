@@ -21,6 +21,7 @@ jobs:
           IND_BIO_ENV: ${{ secrets.IND_BIO_ENV }}
         run: |
           set -euo pipefail
+          mkdir -p ~/.ssh
           install -m 600 /dev/null ~/.ssh/deploy_key
           printf '%s\n' "$VM_SSH_KEY" > ~/.ssh/deploy_key
           tar czf /tmp/ind-bio-monitor.tgz -C ops ind-bio-monitor

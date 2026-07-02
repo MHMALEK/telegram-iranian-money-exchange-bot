@@ -1,0 +1,17 @@
+[Unit]
+Description=IND biometrics slot monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/ind-bio-monitor
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/ubuntu/ind-bio-monitor/.venv/bin/python run_loop.py
+StandardOutput=append:/home/ubuntu/ind-bio-monitor/logs/check.log
+StandardError=append:/home/ubuntu/ind-bio-monitor/logs/check.log
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

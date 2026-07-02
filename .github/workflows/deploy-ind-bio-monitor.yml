@@ -1,0 +1,45 @@
+name: Deploy IND biometrics monitor
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ind-bio-monitor
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy on VM
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+          IND_BIO_ENV: ${{ secrets.IND_BIO_ENV }}
+        run: |
+          set -euo pipefail
+          install -m 600 /dev/null ~/.ssh/deploy_key
+          printf '%s\n' "$VM_SSH_KEY" > ~/.ssh/deploy_key
+          tar czf /tmp/ind-bio-monitor.tgz -C ops ind-bio-monitor
+          ENV_B64=$(printf '%s' "$IND_BIO_ENV" | base64 -w0)
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no /tmp/ind-bio-monitor.tgz "${VM_USER}@${VM_HOST}:/tmp/ind-bio-monitor.tgz"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "${VM_USER}@${VM_HOST}" "set -euo pipefail
+          pkill -f 'python.*run_loop.py' 2>/dev/null || true
+          rm -rf ~/ind-bio-monitor
+          tar xzf /tmp/ind-bio-monitor.tgz -C ~
+          echo '${ENV_B64}' | base64 -d > ~/ind-bio-monitor/.env
+          cd ~/ind-bio-monitor
+          python3 -m venv .venv
+          .venv/bin/pip install -q -r requirements.txt
+          mkdir -p logs state
+          sudo cp deploy/ind-bio-monitor.service /etc/systemd/system/ind-bio-monitor.service
+          sudo systemctl daemon-reload
+          sudo systemctl enable ind-bio-monitor
+          sudo systemctl restart ind-bio-monitor
+          sleep 4
+          sudo systemctl is-active ind-bio-monitor
+          tail -15 ~/ind-bio-monitor/logs/check.log || true
+          "
